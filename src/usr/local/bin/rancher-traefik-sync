@@ -1,0 +1,107 @@
+#!/usr/local/bin/robo
+<?php
+
+use Robo\Tasks;
+
+class RoboFile extends Tasks {
+
+    protected $rancherUrl;
+    
+    protected $rancherUserName;
+    
+    protected $rancherPassword;
+
+    public function sync(string $rancherUrl, string $rancherUsername, string $rancherPassword) {
+        $this->rancherUrl = $rancherUrl;
+        $this->rancherUsername = $rancherUsername;
+        $this->rancherPassword = $rancherPassword;
+        
+        $json = file_get_contents('/mnt/acme.json');
+        $data = json_decode($json);
+
+        foreach($data->DomainsCertificate->Certs as $info) {
+            $this->uploadCertificate($info);
+        }
+    }
+    
+    protected function uploadCertificate($info) {
+        $domainName = $this->formatDomainName($info->Certificate->Domain);
+        $data = json_encode([
+            'name' => $domainName,
+            'key' => $this->formatPrivateKey($info->Certificate->PrivateKey),
+            'cert' => $this->formatCertificate($info->Certificate->Certificate)
+        ]);
+        
+        try {
+            $certificateId = $this->fetchCertificateIdByName($domainName);
+            $message = sprintf('Update certificate for %s', $info->Certificate->Domain);
+            $this->say($message);
+            $this->updateCertificate($data, $certificateId);
+        }
+        catch(RuntimeException $e) {
+            $message = sprintf('Create certificate for %s', $info->Certificate->Domain);
+            $this->say($message);
+            $this->createCertificate($data);
+        }
+    }
+    
+    protected function createCurl() {
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_URL => $this->rancherUrl,
+            CURLOPT_USERNAME => $this->rancherUsername,
+            CURLOPT_PASSWORD => $this->rancherPassword,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json'
+            ]
+        ]);
+        return $curl;
+    }
+    
+    protected function fetchCertificateIdByName(string $name): string {
+        $curl = $this->createCurl();
+        $response = curl_exec($curl);
+        $data = json_decode($response);
+        foreach($data->data as $info) {
+            if($info->name == $name) {
+                return $info->id;
+            }
+        }
+        throw new RuntimeException('Certificate not found');
+    }
+    
+    protected function createCertificate(string $data): void {
+        $curl = $this->createCurl();
+        curl_setopt_array($curl, [
+            CURLOPT_POSTFIELDS => $data
+        ]);
+        curl_exec($curl);
+    }
+    
+    protected function updateCertificate(string $data, string $certificateId): void {
+        $curl = $this->createCurl();
+        curl_setopt_array($curl, [
+            CURLOPT_URL => $this->rancherUrl.'/'.$certificateId,
+            CURLOPT_CUSTOMREQUEST => 'PUT',
+            CURLOPT_POSTFIELDS => $data
+        ]);
+        curl_exec($curl);
+    }
+    
+    protected function formatDomainName(string $domainName): string {
+        $parts = explode('.', $domainName);
+        $parts = array_reverse($parts);
+        return implode('.', $parts);
+    }
+    
+    protected function formatPrivateKey($data) {
+        return base64_decode($data);
+    }
+
+    protected function formatCertificate($data) {
+        return base64_decode($data);
+    }
+
+}
+
