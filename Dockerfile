@@ -1,5 +1,7 @@
 FROM alpine:3.7
 
-RUN apk add --no-cache php7 php7-phar php7-mbstring php7-json php7-curl wget
-RUN wget https://robo.li/robo.phar -O /usr/local/bin/robo && chmod +x /usr/local/bin/robo
 COPY src /
+RUN rancher-traefik-sync-setup
+
+ENTRYPOINT ["rancher-traefik-sync-entrypoint"]
+CMD ["rancher-traefik-sync", "sync"]
