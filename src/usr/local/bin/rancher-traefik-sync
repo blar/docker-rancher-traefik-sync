@@ -108,7 +108,7 @@ class RoboFile extends Tasks {
             return strlen(trim($part)) > 0;
         });
         $parts = array_map(function(string $part) {
-            return $part . '-----END CERTIFICATE-----'
+            return $part . '-----END CERTIFICATE-----';
         }, $parts);
         return $parts;
     }
