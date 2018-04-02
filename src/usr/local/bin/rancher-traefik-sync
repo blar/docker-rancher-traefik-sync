@@ -29,7 +29,8 @@ class RoboFile extends Tasks {
         $data = json_encode([
             'name' => $domainName,
             'key' => $this->formatPrivateKey($info->Certificate->PrivateKey),
-            'cert' => $this->formatCertificate($info->Certificate->Certificate)
+            'cert' => $this->formatCertificate($info->Certificate->Certificate),
+            'certChain' => $this->formatCertificateChain($info->Certificate->Certificate),
         ]);
         
         try {
@@ -62,6 +63,7 @@ class RoboFile extends Tasks {
     protected function fetchCertificateIdByName(string $name): string {
         $curl = $this->createCurl();
         $response = curl_exec($curl);
+        var_dump($response);
         $data = json_decode($response);
         foreach($data->data as $info) {
             if($info->name == $name) {
@@ -95,12 +97,31 @@ class RoboFile extends Tasks {
         return implode('.', $parts);
     }
     
-    protected function formatPrivateKey($data) {
+    protected function formatPrivateKey(string $data): string {
         return base64_decode($data);
     }
 
-    protected function formatCertificate($data) {
-        return base64_decode($data);
+    protected function splitCertificates(string $data): array {
+        $certificates = base64_decode($data);
+        $parts = explode("-----END CERTIFICATE-----\n", $certificates);
+        $parts = array_filter($parts, function(string $part) {
+            return strlen(trim($part)) > 0;
+        });
+        $parts = array_map(function(string $part) {
+            return $part . '-----END CERTIFICATE-----'
+        }, $parts);
+        return $parts;
+    }
+
+
+    protected function formatCertificate(string $data): string {
+        $certificates = $this->splitCertificates($data);
+        return $certificates[0];
+    }
+    
+    protected function formatCertificateChain(string $data): string {
+        $certificates = $this->splitCertificates($data);
+        return $certificates[1];
     }
 
 }

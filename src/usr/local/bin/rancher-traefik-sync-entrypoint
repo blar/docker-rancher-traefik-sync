@@ -1,9 +1,7 @@
 #!/bin/sh
 
 if [ "$1" = "rancher-traefik-sync" ]; then
-    set -- "$@" $RANCHER_PASSWORD
-    set -- "$@" $RANCHER_USERNAME
-    set -- "$@" $RANCHER_URL
+    set "$@" -- $RANCHER_URL $RANCHER_USERNAME $RANCHER_PASSWORD
 fi; 
 
 exec "$@"
