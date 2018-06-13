@@ -15,32 +15,46 @@ class RoboFile extends Tasks {
         $this->rancherUrl = $rancherUrl;
         $this->rancherUsername = $rancherUsername;
         $this->rancherPassword = $rancherPassword;
+
+        $acmeFileName = '/mnt/acme.json';
+        if(!file_exists($acmeFileName)) {
+            printf("Acme file '%s' not found\n", $acmeFileName);
+            die(1);
+        }
+
+        printf("Process '%s'\n'", $acmeFileName);
         
-        $json = file_get_contents('/mnt/acme.json');
+        $json = file_get_contents($acmeFileName);
         $data = json_decode($json);
 
-        foreach($data->DomainsCertificate->Certs as $info) {
+        if(!isset($data->Certificates)) {
+            printf("No certificates found in '%s'\n", $acmeFileName);
+            die(1);
+        }
+
+        foreach($data->Certificates as $info) {
             $this->uploadCertificate($info);
         }
     }
     
     protected function uploadCertificate($info) {
-        $domainName = $this->formatDomainName($info->Certificate->Domain);
+        $domainName = $this->formatDomainName($info->Domain->Main);
+
         $data = json_encode([
             'name' => $domainName,
-            'key' => $this->formatPrivateKey($info->Certificate->PrivateKey),
-            'cert' => $this->formatCertificate($info->Certificate->Certificate),
-            'certChain' => $this->formatCertificateChain($info->Certificate->Certificate),
-        ]);
-        
+            'key' => $this->formatPrivateKey($info->Key),
+            'cert' => $this->formatCertificate($info->Certificate),
+            'certChain' => $this->formatCertificateChain($info->Certificate),
+        ], JSON_PRETTY_PRINT);
+
         try {
             $certificateId = $this->fetchCertificateIdByName($domainName);
-            $message = sprintf('Update certificate for %s', $info->Certificate->Domain);
+            $message = sprintf('Update certificate for %s', $domainName);
             $this->say($message);
             $this->updateCertificate($data, $certificateId);
         }
         catch(RuntimeException $e) {
-            $message = sprintf('Create certificate for %s', $info->Certificate->Domain);
+            $message = sprintf('Create certificate for %s', $domainName);
             $this->say($message);
             $this->createCertificate($data);
         }
@@ -63,7 +77,6 @@ class RoboFile extends Tasks {
     protected function fetchCertificateIdByName(string $name): string {
         $curl = $this->createCurl();
         $response = curl_exec($curl);
-        var_dump($response);
         $data = json_decode($response);
         foreach($data->data as $info) {
             if($info->name == $name) {
@@ -103,7 +116,7 @@ class RoboFile extends Tasks {
 
     protected function splitCertificates(string $data): array {
         $certificates = base64_decode($data);
-        $parts = explode("-----END CERTIFICATE-----\n", $certificates);
+        $parts = explode("-----END CERTIFICATE-----\n\n", $certificates);
         $parts = array_filter($parts, function(string $part) {
             return strlen(trim($part)) > 0;
         });
@@ -112,7 +125,6 @@ class RoboFile extends Tasks {
         }, $parts);
         return $parts;
     }
-
 
     protected function formatCertificate(string $data): string {
         $certificates = $this->splitCertificates($data);
