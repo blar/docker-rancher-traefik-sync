@@ -1,7 +1,19 @@
 #!/bin/sh
 
-if [ "$1" = "rancher-traefik-sync" ]; then
+if [ -n "$RANCHER_URL " ]; then
+    export RANCHER_URL=${CATTLE_URL/v1/v2-beta}
+fi
+
+if [ -n "$RANCHER_USERNAME" ]; then
+    export RANCHER_USERNAME=$CATTLE_ACCESS_KEY
+fi
+
+if [ -n "$RANCHER_PASSWORD" ]; then
+    export RANCHER_PASSWORD=$CATTLE_SECRET_KEY
+fi
+
+if [ "$1" = "traefik-rancher-sync" ]; then
     set "$@" -- $RANCHER_URL $RANCHER_USERNAME $RANCHER_PASSWORD
-fi; 
+fi;
 
 exec "$@"
