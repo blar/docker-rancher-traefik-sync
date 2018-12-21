@@ -33,7 +33,12 @@ class RoboFile extends Tasks {
         }
 
         foreach($data->Certificates as $info) {
-            $this->uploadCertificate($info);
+            try {
+                $this->uploadCertificate($info);
+            }
+            catch(Throwable $e) {
+                var_dump($e->getMessage());
+            }
         }
     }
     
@@ -133,6 +138,9 @@ class RoboFile extends Tasks {
     
     protected function formatCertificateChain(string $data): string {
         $certificates = $this->splitCertificates($data);
+        if(!array_key_exists(1, $certificates)) {
+           throw new RuntimeException('Certifiate chain failed');
+        }
         return $certificates[1];
     }
 
